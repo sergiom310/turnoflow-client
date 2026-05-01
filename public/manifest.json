@@ -1,0 +1,12 @@
+{
+  "name": "TurnoFlow",
+  "short_name": "TurnoFlow",
+  "description": "Sistema de Apartado de Turnos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": []
+}
