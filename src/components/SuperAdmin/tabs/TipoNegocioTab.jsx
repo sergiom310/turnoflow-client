@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import styled from 'styled-components'
-import { useBusiness } from '../../../context/BusinessContext'
+import api from '../../../utils/api'
 
 const Container = styled.div`
   max-width: 1000px;
@@ -130,8 +130,8 @@ const SaveButton = styled.button`
   }
 `
 
-// Paletas de colores por tipo de negocio (para preview rápido)
-const BUSINESS_COLORS = {
+// Paletas fallback locales (se usan para preview antes de cargar la API)
+const FALLBACK_COLORS = {
   beauty:       { primary: '#E91E63', secondary: '#F48FB1', accent: '#FFEB3B' },
   health:       { primary: '#1976D2', secondary: '#42A5F5', accent: '#4CAF50' },
   fitness:      { primary: '#FF5722', secondary: '#FF9800', accent: '#FFC107' },
@@ -142,170 +142,151 @@ const BUSINESS_COLORS = {
   veterinary:   { primary: '#795548', secondary: '#A1887F', accent: '#D7CCC8' },
   education:    { primary: '#FF9800', secondary: '#FFB74D', accent: '#FFF3E0' },
   retail:       { primary: '#7B1FA2', secondary: '#BA68C8', accent: '#E1BEE7' },
-  other:        { primary: '#546E7A', secondary: '#78909C', accent: '#B0BEC5' }
+  other:        { primary: '#546E7A', secondary: '#78909C', accent: '#B0BEC5' },
 }
 
-/**
- * Aplica colores como preview temporal en las variables CSS
- */
-const previewTheme = (type) => {
-  const colors = BUSINESS_COLORS[type]
+const applyPreview = (colors) => {
   if (!colors) return
   const root = document.documentElement
-  root.style.setProperty('--primary-color', colors.primary)
-  root.style.setProperty('--secondary-color', colors.secondary)
-  root.style.setProperty('--accent-color', colors.accent)
+  root.style.setProperty('--primary-color',   colors.primary   || colors[0])
+  root.style.setProperty('--secondary-color', colors.secondary || colors[1])
+  root.style.setProperty('--accent-color',    colors.accent    || colors[2])
 }
 
 const TipoNegocioTab = () => {
-  const [selectedBusiness, setSelectedBusiness] = useState('beauty')
-  const [loading, setLoading] = useState(false)
+  const [businessTypes,    setBusinessTypes]    = useState([])
+  const [selectedId,       setSelectedId]       = useState(null)
+  const [editingColors,    setEditingColors]    = useState(null) // { primary, secondary, accent }
+  const [loading,          setLoading]          = useState(true)
+  const [saving,           setSaving]           = useState(false)
 
-  // Al cargar el componente, aplicar el tema guardado
+  // Guardar los colores actuales al entrar y restaurarlos al salir
   useEffect(() => {
-    const saved = localStorage.getItem('businessType')
-    if (saved) {
-      setSelectedBusiness(saved)
-      previewTheme(saved)
+    const root = document.documentElement
+    const original = {
+      primary:   root.style.getPropertyValue('--primary-color').trim()   || null,
+      secondary: root.style.getPropertyValue('--secondary-color').trim() || null,
+      accent:    root.style.getPropertyValue('--accent-color').trim()    || null,
+    }
+    return () => {
+      // Restaurar al desmontar solo si el usuario no guardó
+      if (original.primary)   root.style.setProperty('--primary-color',   original.primary)
+      if (original.secondary) root.style.setProperty('--secondary-color', original.secondary)
+      if (original.accent)    root.style.setProperty('--accent-color',    original.accent)
     }
   }, [])
 
-  const businessTypes = [
-    {
-      id: 'beauty',
-      name: 'Belleza y Cuidado Personal',
-      icon: '💇',
-      description: 'Salones de belleza, peluquerías, barberías, centros de estética, manicuristas, pedicuristas, spa y masajistas.',
-      colors: ['#E91E63', '#F48FB1', '#FFEB3B']
-    },
-    {
-      id: 'health',
-      name: 'Salud y Bienestar',
-      icon: '🏥',
-      description: 'Consultorios médicos, clínicas y centros de salud, psicólogos, psiquiatras, odontólogos, nutricionistas, terapias alternativas.',
-      colors: ['#1976D2', '#42A5F5', '#4CAF50']
-    },
-    {
-      id: 'fitness',
-      name: 'Actividad Física y Formación',
-      icon: '🏋️',
-      description: 'Gimnasios, entrenadores personales, clases grupales (yoga, baile, pilates, boxeo), profesores particulares.',
-      colors: ['#FF5722', '#FF9800', '#FFC107']
-    },
-    {
-      id: 'professional',
-      name: 'Servicios Profesionales',
-      icon: '🧾',
-      description: 'Abogados, contadores, asesores financieros, consultores, agentes inmobiliarios.',
-      colors: ['#9C27B0', '#BA68C8', '#E1BEE7']
-    },
-    {
-      id: 'technical',
-      name: 'Servicios Técnicos',
-      icon: '🛠️',
-      description: 'Talleres de reparación, mecánicos automotrices, centros de diagnóstico vehicular, reparación de equipos.',
-      colors: ['#607D8B', '#90A4AE', '#B0BEC5']
-    },
-    {
-      id: 'restaurant',
-      name: 'Gastronomía',
-      icon: '🧑‍🍳',
-      description: 'Restaurantes con alta demanda, cafés con espacios limitados, food trucks con atención por orden.',
-      colors: ['#FF6F00', '#FFB74D', '#FFF3E0']
-    },
-    {
-      id: 'public',
-      name: 'Sector Público y Trámites',
-      icon: '🏢',
-      description: 'Notarías, oficinas de tránsito, EPS/IPS, centros de atención ciudadana.',
-      colors: ['#2E7D32', '#4CAF50', '#81C784']
-    },
-    {
-      id: 'veterinary',
-      name: 'Veterinarias y Spa Animales',
-      icon: '🐾',
-      description: 'Clínicas veterinarias, peluquería canina, grooming, baños medicados, guarderías, hoteles para mascotas.',
-      colors: ['#795548', '#A1887F', '#D7CCC8']
-    },
-    {
-      id: 'education',
-      name: 'Educación',
-      icon: '🎓',
-      description: 'Instituciones educativas, academias, cursos y capacitación.',
-      colors: ['#FF9800', '#FFB74D', '#FFF3E0']
-    },
-    {
-      id: 'retail',
-      name: 'Comercio Minorista',
-      icon: '🛍️',
-      description: 'Tiendas, boutiques, comercios minoristas y servicios comerciales.',
-      colors: ['#7B1FA2', '#BA68C8', '#E1BEE7']
-    },
-    {
-      id: 'other',
-      name: 'Otros Servicios',
-      icon: '🔧',
-      description: 'Otros tipos de negocio que requieren sistema de turnos.',
-      colors: ['#546E7A', '#78909C', '#B0BEC5']
-    }
-  ]
+  useEffect(() => {
+    api.get('/business-types')
+      .then(types => {
+        const list = Array.isArray(types) ? types : []
+        setBusinessTypes(list)
+        if (list.length > 0) {
+          setSelectedId(list[0].id)
+          const c = list[0].default_colors || FALLBACK_COLORS[list[0].slug] || {}
+          setEditingColors({ primary: c.primary || '#000000', secondary: c.secondary || '#000000', accent: c.accent || '#ffffff' })
+          // NO llamar applyPreview aquí para no dañar los colores actuales
+        }
+      })
+      .catch(() => toast.error('Error al cargar tipos de negocio'))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const { updateBusinessType, getBusinessComponents } = useBusiness()
+  const handleSelect = (bt) => {
+    setSelectedId(bt.id)
+    const c = bt.default_colors || FALLBACK_COLORS[bt.slug] || {}
+    const colors = { primary: c.primary || '#000000', secondary: c.secondary || '#000000', accent: c.accent || '#ffffff' }
+    setEditingColors(colors)
+    applyPreview(colors)
+  }
+
+  const handleColorChange = (key, value) => {
+    const updated = { ...editingColors, [key]: value }
+    setEditingColors(updated)
+    applyPreview(updated)
+  }
 
   const handleSave = async () => {
-    setLoading(true)
+    if (!selectedId) return
+    setSaving(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      updateBusinessType(selectedBusiness)
-      
-      const business = getBusinessComponents(selectedBusiness)
-      toast.success(`${business.icon} ${business.name} configurado exitosamente. El menú se adaptará automáticamente.`)
-    } catch (error) {
-      toast.error('Error al guardar la configuración')
+      const r = await api.admin.patch('/superadmin/business-types/' + selectedId, {
+        default_colors: editingColors,
+      })
+      // Actualizar la lista local
+      setBusinessTypes(prev => prev.map(bt => bt.id === selectedId
+        ? { ...bt, default_colors: r.default_colors }
+        : bt
+      ))
+      toast.success('Colores del tipo de negocio guardados')
+    } catch (err) {
+      toast.error(err?.message || 'Error al guardar configuración')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  const selectedType = businessTypes.find(type => type.id === selectedBusiness)
+  const selectedType = businessTypes.find(bt => bt.id === selectedId)
+
+  if (loading) return <Container><p style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>Cargando...</p></Container>
 
   return (
     <Container>
       <BusinessTypesGrid>
-        {businessTypes.map(type => (
-          <BusinessCard
-            key={type.id}
-            selected={selectedBusiness === type.id}
-            onClick={() => {
-              setSelectedBusiness(type.id)
-              previewTheme(type.id) // Preview en vivo de los colores
-            }}
-          >
-            <BusinessIcon>{type.icon}</BusinessIcon>
-            <BusinessTitle>{type.name}</BusinessTitle>
-            <BusinessDescription>{type.description}</BusinessDescription>
-            <ColorPalette>
-              {type.colors.map((color, index) => (
-                <ColorSwatch key={index} color={color} />
-              ))}
-            </ColorPalette>
-          </BusinessCard>
-        ))}
+        {businessTypes.map(bt => {
+          const colors = bt.default_colors || FALLBACK_COLORS[bt.slug] || {}
+          return (
+            <BusinessCard
+              key={bt.id}
+              selected={selectedId === bt.id}
+              onClick={() => handleSelect(bt)}
+            >
+              <BusinessIcon>{bt.icon || '🏢'}</BusinessIcon>
+              <BusinessTitle>{bt.name}</BusinessTitle>
+              <BusinessDescription>{bt.description}</BusinessDescription>
+              <ColorPalette>
+                {[colors.primary, colors.secondary, colors.accent].filter(Boolean).map((color, i) => (
+                  <ColorSwatch key={i} color={color} />
+                ))}
+              </ColorPalette>
+            </BusinessCard>
+          )
+        })}
       </BusinessTypesGrid>
 
       <SaveSection>
         <CurrentSelection>
-          <h4>Selección Actual</h4>
-          <p>
-            {selectedType ? `${selectedType.icon} ${selectedType.name}` : 'Ninguno seleccionado'}
-          </p>
+          <h4>Tipo seleccionado</h4>
+          <p>{selectedType ? `${selectedType.icon || ''} ${selectedType.name}` : 'Ninguno seleccionado'}</p>
         </CurrentSelection>
-        <SaveButton onClick={handleSave} disabled={loading}>
-          {loading ? 'Configurando...' : 'Aplicar Configuración'}
+
+        {editingColors && (
+          <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
+            {[
+              { key: 'primary',   label: 'Color principal' },
+              { key: 'secondary', label: 'Color secundario' },
+              { key: 'accent',    label: 'Acento' },
+            ].map(({ key, label }) => (
+              <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{label}</label>
+                <input
+                  type="color"
+                  value={editingColors[key] || '#000000'}
+                  onChange={e => handleColorChange(key, e.target.value)}
+                  style={{ width: 48, height: 48, border: 'none', borderRadius: 8, cursor: 'pointer', padding: 2 }}
+                />
+                <span style={{ fontSize: 11, color: '#9ca3af' }}>{editingColors[key]}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <SaveButton onClick={handleSave} disabled={saving || !selectedId}>
+          {saving ? 'Guardando...' : 'Guardar paleta de colores'}
         </SaveButton>
-        <p style={{fontSize: '12px', color: '#6b7280', marginTop: '12px'}}>
-          Al cambiar el tipo de negocio, el menú y componentes disponibles se adaptarán automáticamente.
+        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12 }}>
+          Los colores guardados aquí son la paleta por defecto para todos los negocios de este tipo.
+          Cada negocio puede personalizar su propia paleta desde su panel de configuración.
         </p>
       </SaveSection>
     </Container>

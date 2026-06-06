@@ -34,6 +34,21 @@ const BUSINESS_COLORS = {
 };
 
 /**
+ * Aplica colores directamente como variables CSS globales.
+ * Acepta tanto objeto como string JSON (el backend lo guarda serializado).
+ */
+const applyBusinessThemeFromColors = (colors) => {
+  if (!colors) return;
+  const parsed = typeof colors === 'string' ? JSON.parse(colors) : colors;
+  if (!parsed) return;
+  const root = document.documentElement;
+  if (parsed.primary)   { root.style.setProperty('--primary-color',   parsed.primary);   root.style.setProperty('--primary-rgb',   hexToRgb(parsed.primary)); }
+  if (parsed.secondary) { root.style.setProperty('--secondary-color', parsed.secondary); root.style.setProperty('--secondary-rgb', hexToRgb(parsed.secondary)); }
+  if (parsed.accent)    { root.style.setProperty('--accent-color',    parsed.accent);    root.style.setProperty('--accent-rgb',    hexToRgb(parsed.accent)); }
+  localStorage.setItem('businessTheme', JSON.stringify(parsed));
+};
+
+/**
  * Aplica los colores del tipo de negocio como variables CSS globales
  */
 const applyBusinessTheme = (type) => {
@@ -71,14 +86,31 @@ export const BusinessProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedType = localStorage.getItem('businessType');
-    const savedSubtype = localStorage.getItem('businessSubtype');
-    const type = savedType || 'beauty';
-    const subtype = savedSubtype || getSubtypes(type)[0]?.id || null;
-    setBusinessType(type);
-    setBusinessSubtype(subtype);
-    applyBusinessTheme(type);
-    setLoading(false);
+    // Prioridad: theme_colors del tenant > default_colors del tipo > fallback por slug
+    try {
+      const savedTenant = JSON.parse(localStorage.getItem('tenant') || 'null')
+      if (savedTenant?.theme_colors) {
+        applyBusinessThemeFromColors(savedTenant.theme_colors)
+      } else if (savedTenant?.default_colors) {
+        applyBusinessThemeFromColors(savedTenant.default_colors)
+      } else {
+        // Si hay un subdominio de tenant pero aún no hay sesión (p.ej. pantalla de login),
+        // NO aplicar colores de fallback: Login.jsx cargará /theme y aplicará los correctos.
+        const hostname = window.location.hostname
+        const parts = hostname.split('.')
+        const hasTenantSubdomain = parts.length >= 3 && hostname !== 'localhost'
+        if (!hasTenantSubdomain) {
+          const savedType = savedTenant?.business_type || localStorage.getItem('businessType') || 'beauty'
+          setBusinessType(savedType)
+          const savedSubtype = savedTenant?.business_subtype || localStorage.getItem('businessSubtype') || null
+          setBusinessSubtype(savedSubtype || getSubtypes(savedType)[0]?.id || null)
+          applyBusinessTheme(savedType)
+        }
+      }
+    } catch {
+      applyBusinessTheme('beauty')
+    }
+    setLoading(false)
   }, []);
 
   const updateBusinessType = (type, subtype) => {

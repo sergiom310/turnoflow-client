@@ -1,14 +1,47 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import { toast } from 'react-toastify'
 import styled from 'styled-components'
+import api from '../../utils/api'
+import { useAuth } from '../../context/AuthContext'
 
-// Esquema de validación
+// ── Detecta si el visitante llega desde un subdominio de tenant ──────────
+// Dev:  cliente1.turnoflow.local:5173 → isTenant = true
+// Dev:  localhost:5173               → isTenant = false (superadmin)
+// Prod: cliente1.turnoflow.co        → isTenant = true
+// Prod: app.turnoflow.co             → isTenant = false (superadmin)
+const detectSubdomain = () => {
+  const hostname = window.location.hostname
+  const parts    = hostname.split('.')
+  // "localhost" o IPs → superadmin
+  if (parts.length < 2 || hostname === 'localhost') return null
+  // El subdominio es la primera parte si hay al menos 3 segmentos
+  if (parts.length >= 3) return parts[0]
+  return null
+}
+
+const subdomain = detectSubdomain()
+const isTenant  = subdomain !== null
+
+// Aplica paleta de colores a las CSS vars globales.
+// Acepta tanto objeto como string JSON (el backend guarda JSON serializado).
+const applyThemeColors = (colors) => {
+  if (!colors) return
+  const parsed = typeof colors === 'string' ? JSON.parse(colors) : colors
+  if (!parsed) return
+  const hexToRgb = h => { const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h); return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '0,0,0' }
+  const root = document.documentElement
+  if (parsed.primary)   { root.style.setProperty('--primary-color',   parsed.primary);   root.style.setProperty('--primary-rgb',   hexToRgb(parsed.primary)) }
+  if (parsed.secondary) { root.style.setProperty('--secondary-color', parsed.secondary); root.style.setProperty('--secondary-rgb', hexToRgb(parsed.secondary)) }
+  if (parsed.accent)    { root.style.setProperty('--accent-color',    parsed.accent);    root.style.setProperty('--accent-rgb',    hexToRgb(parsed.accent)) }
+}
+
+// ── Esquema de validación ────────────────────────────────────────────────
 const schema = yup.object({
-  username: yup.string().required('El usuario es requerido'),
+  username: yup.string().required('El usuario o email es requerido'),
   password: yup.string().min(6, 'La contraseña debe tener al menos 6 caracteres').required('La contraseña es requerida')
 })
 
@@ -210,29 +243,65 @@ const PWABanner = styled.div`
 `
 
 const Login = () => {
-  const [loading, setLoading] = useState(false)
+  const [loading,       setLoading]       = useState(false)
   const [showPWABanner, setShowPWABanner] = useState(false)
-  const navigate = useNavigate()
+  const [tenantBrand,   setTenantBrand]   = useState(null) // { name, logo_url, theme_colors, default_colors }
+  const navigate  = useNavigate()
+  const { login } = useAuth()
+
+  // Cargar tema del tenant si estamos en un subdominio.
+  // Usamos fetch directo (sin cookie logic) porque /theme es público.
+  useEffect(() => {
+    if (!isTenant) return
+    const base = import.meta.env.VITE_API_URL ?? '/api/v1'
+    fetch(`${base}/theme`, { credentials: 'omit' })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json) return
+        const brand = json?.data ?? json
+        setTenantBrand(brand)
+        applyThemeColors(brand.theme_colors || brand.default_colors)
+      })
+      .catch(() => {})
+  }, [])
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(schema)
   })
 
-  const onSubmit = async (data) => {
+  const onSubmit = async ({ username, password }) => {
     setLoading(true)
     try {
-      // Aquí irá la lógica de autenticación con el backend
-      // Por ahora, simular login exitoso
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // Simular respuesta exitosa
-      localStorage.setItem('token', 'fake-jwt-token')
-      localStorage.setItem('user', JSON.stringify({ username: data.username, role: 'admin' }))
-      
-      toast.success('¡Bienvenido a TurnoFlow!')
-      navigate('/dashboard')
+      if (isTenant) {
+        // ── Login de tenant ────────────────────────────────────────────
+        const session = await api.post('/auth/login', { username, password })
+        // Cookie httpOnly seteada por servidor. Guardamos solo datos de UI:
+        localStorage.setItem('user',        JSON.stringify(session.user))
+        localStorage.setItem('permissions', JSON.stringify(session.permissions))
+        localStorage.setItem('tenant',      JSON.stringify(session.tenant))
+        // Aplicar colores del tenant ANTES de navegar para que el dashboard
+        // arranque con la paleta correcta (BusinessContext no re-ejecuta su useEffect)
+        applyThemeColors(session.tenant?.theme_colors || session.tenant?.default_colors)
+        login(session, false)
+        toast.success(`¡Bienvenido, ${session.user.first_name ?? username}!`)
+        navigate('/dashboard')
+      } else {
+        // ── Login de superadmin ────────────────────────────────────────
+        const session = await api.admin.post('/superadmin/auth/login', { username, password })
+        api.admin.setSaTokens({ accessToken: session.accessToken, refreshToken: session.refreshToken })
+        localStorage.setItem('user', JSON.stringify(session.user))
+        login(session, true)
+        toast.success(`¡Bienvenido, ${session.user.first_name ?? username}!`)
+        navigate('/dashboard')
+      }
     } catch (error) {
-      toast.error('Error al iniciar sesión. Verifica tus credenciales.')
+      if (error.code === 'INVALID_CREDENTIALS') {
+        toast.error('Usuario o contraseña incorrectos')
+      } else if (error.code === 'TENANT_NOT_FOUND') {
+        toast.error('Negocio no encontrado o inactivo')
+      } else {
+        toast.error(error.message ?? 'Error al iniciar sesión')
+      }
     } finally {
       setLoading(false)
     }
@@ -246,7 +315,6 @@ const Login = () => {
   })
 
   const handleInstallPWA = () => {
-    // Lógica para instalar PWA
     setShowPWABanner(false)
     toast.info('Instalación iniciada')
   }
@@ -256,15 +324,19 @@ const Login = () => {
       <LoginContainer>
         <LoginCard>
           <Logo>
-            <h1>TurnoFlow</h1>
-            <p>Sistema de Apartado de Turnos</p>
+            {isTenant && tenantBrand?.logo_url
+              ? <img src={tenantBrand.logo_url} alt="logo" style={{ height: 64, objectFit: 'contain', marginBottom: 8 }} />
+              : <h1>{isTenant && tenantBrand?.name ? tenantBrand.name : 'TurnoFlow'}</h1>
+            }
+            <p>{isTenant ? 'Bienvenido, inicia sesión' : 'Sistema de Apartado de Turnos'}</p>
           </Logo>
 
           <Form onSubmit={handleSubmit(onSubmit)}>
             <FormGroup>
               <Input
                 type="text"
-                placeholder="Usuario"
+                placeholder="Usuario o email"
+                autoComplete="username"
                 {...register('username')}
                 disabled={loading}
               />

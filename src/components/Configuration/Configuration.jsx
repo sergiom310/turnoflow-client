@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { useBusiness } from '../../context/BusinessContext'
+import { useAuth } from '../../context/AuthContext'
 import RolesTab from './tabs/RolesTab'
 import BusinessConfigTab from './tabs/BusinessConfigTab'
+import MiEmpresaTab from './tabs/MiEmpresaTab'
+import SuscripcionTab from './tabs/SuscripcionTab'
 
 const ConfigContainer = styled.div`
   min-height: 100vh;
@@ -114,7 +117,8 @@ const Content = styled.div`
 
 const Configuration = () => {
   const { businessType, businessConfig, getBusinessComponents } = useBusiness()
-  const [activeTab, setActiveTab] = useState('roles')
+  const { isSuperAdmin, tenant } = useAuth()
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'roles' : 'empresa')
   
   const business = getBusinessComponents(businessType)
 
@@ -181,27 +185,42 @@ const Configuration = () => {
   }
 
   useEffect(() => {
-    setActiveTab('roles')
-  }, [businessType])
+    setActiveTab(isSuperAdmin ? 'roles' : 'empresa')
+  }, [businessType, isSuperAdmin])
 
+  // ── Tabs para TENANT ─────────────────────────────────────
+  const tenantTabs = [
+    { id: 'empresa',      label: '🏢 Mi Empresa',    component: MiEmpresaTab },
+    { id: 'suscripcion',  label: '💳 Suscripción',   component: SuscripcionTab },
+    { id: 'roles',        label: '🔒 Roles y Permisos', component: RolesTab },
+  ]
+
+  // ── Tabs para SUPERADMIN ──────────────────────────────────
   const baseTabs = [
     { id: 'roles', label: 'Roles y Permisos', component: RolesTab }
   ]
 
   const businessTabs = getBusinessTabs(businessType)
-  const allTabs = [...baseTabs, ...businessTabs]
+  const allTabs = isSuperAdmin
+    ? [...baseTabs, ...businessTabs]
+    : tenantTabs
 
   const ActiveComponent = allTabs.find(tab => tab.id === activeTab)?.component
+
+  // Header subtitle
+  const subtitle = isSuperAdmin
+    ? 'Administra roles, permisos y configuraciones específicas del negocio'
+    : `${tenant?.name ?? 'Mi negocio'} · ${tenant?.plan ?? 'free'}`
 
   return (
     <ConfigContainer>
       <ConfigCard>
         <Header>
-          <h1>Configuración del Sistema</h1>
-          <p>Administra roles, permisos y configuraciones específicas del negocio</p>
+          <h1>Configuración</h1>
+          <p>{subtitle}</p>
           <BusinessBadge>
             <span>{business.icon}</span>
-            <span>{business.name}</span>
+            <span>{isSuperAdmin ? business.name : (tenant?.business_type ?? business.name)}</span>
           </BusinessBadge>
         </Header>
 

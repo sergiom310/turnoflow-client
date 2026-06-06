@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import styled from 'styled-components'
 import { useBusiness } from '../../context/BusinessContext'
+import { useAuth } from '../../context/AuthContext'
 
 const SidebarContainer = styled.div`
   position: fixed;
@@ -390,8 +391,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const business = getBusinessComponents(businessType)
-  
-  const userRole = 'superadmin'
+  const { user, tenant, isSuperAdmin, logout } = useAuth()
 
   const organizeMenuBySections = (components) => {
     const sections = {
@@ -514,7 +514,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       active: location.pathname === '/configuration'
     })
     
-    if (userRole === 'superadmin') {
+    if (isSuperAdmin) {
       configItems.push({
         id: 'super-admin',
         label: 'Super Admin',
@@ -558,12 +558,10 @@ const Sidebar = ({ collapsed, onToggle }) => {
     setShowLogoutModal(true)
   }
 
-  const confirmLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+  const confirmLogout = async () => {
     setShowLogoutModal(false)
+    await logout()
     toast.success('Sesión cerrada exitosamente')
-    navigate('/')
   }
 
   const cancelLogout = () => {
@@ -620,15 +618,19 @@ const Sidebar = ({ collapsed, onToggle }) => {
             <div className="logo-text">TurnoFlow</div>
           </Logo>
           <UserInfo>
-            <div className="user-name">Admin User</div>
+            <div className="user-name">
+              {user ? `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.username : 'Usuario'}
+            </div>
             <div className="user-role">
-              {userRole === 'superadmin' ? 'Super Admin' : 'Administrador'}
+              {isSuperAdmin ? 'Super Admin' : (user?.role ?? 'Administrador')}
             </div>
           </UserInfo>
-          <BusinessTypeBadge>
-            <span>{business.icon}</span>
-            <span>{business.name}</span>
-          </BusinessTypeBadge>
+          {tenant && (
+            <BusinessTypeBadge>
+              <span>{business.icon}</span>
+              <span>{tenant.name}</span>
+            </BusinessTypeBadge>
+          )}
         </SidebarHeader>
 
         <SidebarContent>

@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import { AuthProvider } from './context/AuthContext'
 import { BusinessProvider } from './context/BusinessContext'
 import { ClienteProvider } from './context/ClienteContext'
 import Login from './components/Login/Login'
@@ -29,62 +30,65 @@ import './App.css'
 
 function App() {
   return (
-    <BusinessProvider>
-      <ClienteProvider>
-        <Router>
-          <div className="App">
-            <Routes>
-              {/* Login Principal */}
-              <Route index element={<Login />} />
+    <Router>
+      <AuthProvider>
+        <BusinessProvider>
+          <ClienteProvider>
+            <div className="App">
+              <Routes>
+                {/* Login Principal */}
+                <Route index element={<Login />} />
+                <Route path="login" element={<Login />} />
 
-              {/* Login Cliente */}
-              <Route path="cliente">
-                <Route index element={<ClienteLogin />} />
-                <Route element={<ClienteLayout />}>
-                  <Route path="dashboard" element={<ClienteDashboard />} />
-                  <Route path="agendar" element={<ClienteAgenda />} />
-                  <Route path="servicios" element={<ClienteServicios />} />
-                  <Route path="productos" element={<ClienteProductos />} />
-                  <Route path="mis-citas" element={<ClienteMisCitas />} />
+                {/* Login Cliente */}
+                <Route path="cliente">
+                  <Route index element={<ClienteLogin />} />
+                  <Route element={<ClienteLayout />}>
+                    <Route path="dashboard" element={<ClienteDashboard />} />
+                    <Route path="agendar" element={<ClienteAgenda />} />
+                    <Route path="servicios" element={<ClienteServicios />} />
+                    <Route path="productos" element={<ClienteProductos />} />
+                    <Route path="mis-citas" element={<ClienteMisCitas />} />
+                  </Route>
                 </Route>
-              </Route>
 
-              {/* Rutas del Sistema (Admin) */}
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="super-admin" element={<SuperAdmin />} />
-                <Route path="configuration" element={<Configuration />} />
+                {/* Rutas del Sistema (Admin) */}
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="super-admin" element={<SuperAdmin />} />
+                  <Route path="configuration" element={<Configuration />} />
                   <Route path="users" element={<Users />} />
                   <Route path="usuarios" element={<Users />} />
                   <Route path="clients" element={<Clients />} />
                   <Route path="clientes" element={<Clients />} />
-                <Route path="agenda" element={<Agenda />} />
-                <Route path="servicios" element={<Servicios />} />
-                <Route path="turnos" element={<Turnos />} />
-                <Route path="promociones" element={<Promociones />} />
-                <Route path="arqueo" element={<Arqueo />} />
-                <Route path="inventario" element={<Inventario />} />
-                <Route path="cobrar" element={<Cobrar />} />
-                <Route path="reportes" element={<Reportes />} />
-              </Route>
-            </Routes>
-            <ToastContainer
-              position="top-right"
-              autoClose={5000}
-              hideProgressBar={false}
-              newestOnTop={false}
-              closeOnClick
-              rtl={false}
-              pauseOnFocusLoss
-              draggable
-              pauseOnHover
-              theme="light"
-            />
-          </div>
-        </Router>
-      </ClienteProvider>
-    </BusinessProvider>
+                  <Route path="agenda" element={<Agenda />} />
+                  <Route path="servicios" element={<Servicios />} />
+                  <Route path="turnos" element={<Turnos />} />
+                  <Route path="promociones" element={<Promociones />} />
+                  <Route path="arqueo" element={<Arqueo />} />
+                  <Route path="inventario" element={<Inventario />} />
+                  <Route path="cobrar" element={<Cobrar />} />
+                  <Route path="reportes" element={<Reportes />} />
+                </Route>
+              </Routes>
+              <ToastContainer
+                position="top-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+              />
+            </div>
+          </ClienteProvider>
+        </BusinessProvider>
+      </AuthProvider>
+    </Router>
   )
 }
 
