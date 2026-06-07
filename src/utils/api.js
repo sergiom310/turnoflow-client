@@ -155,7 +155,7 @@ const adminRequest = async (endpoint, options = {}, retry = false) => {
       return adminRequest(endpoint, options, true)
     }
     clearSaAuth()
-    window.location.href = '/superadmin/login'
+    window.location.href = '/login'
     return
   }
 
