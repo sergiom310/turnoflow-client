@@ -254,7 +254,10 @@ const Login = () => {
   useEffect(() => {
     if (!isTenant) return
     const base = import.meta.env.VITE_API_URL ?? '/api/v1'
-    fetch(`${base}/theme`, { credentials: 'omit' })
+    fetch(`${base}/theme`, {
+      credentials: 'omit',
+      headers: { 'X-Tenant-Subdomain': subdomain },
+    })
       .then(r => r.ok ? r.json() : null)
       .then(json => {
         if (!json) return

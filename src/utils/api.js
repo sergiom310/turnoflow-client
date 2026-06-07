@@ -26,6 +26,26 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api/v1'
 
+const detectTenantSubdomain = () => {
+  if (typeof window === 'undefined') return null
+  const hostname = window.location.hostname
+  const parts = hostname.split('.')
+
+  if (parts.length < 2 || hostname === 'localhost') return null
+  if (parts.length >= 3) return parts[0]
+  return null
+}
+
+const buildTenantHeaders = (headers = {}) => {
+  const tenantSubdomain = detectTenantSubdomain()
+  if (!tenantSubdomain) return headers
+
+  return {
+    ...headers,
+    'X-Tenant-Subdomain': tenantSubdomain,
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // TENANT API — cookies httpOnly
 // ═══════════════════════════════════════════════════════════════
@@ -35,6 +55,7 @@ const tryRefreshTenant = async () => {
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
       method:      'POST',
+      headers:     buildTenantHeaders(),
       credentials: 'include',   // envía la refresh cookie y recibe la nueva access cookie
     })
     return res.ok
@@ -46,7 +67,11 @@ const tryRefreshTenant = async () => {
 /** Función central para llamadas de tenant (con cookies). */
 const tenantRequest = async (endpoint, options = {}, retry = false) => {
   const url = `${BASE_URL}${endpoint}`
-  const res = await fetch(url, { ...options, credentials: 'include' })
+  const res = await fetch(url, {
+    ...options,
+    headers: buildTenantHeaders(options.headers),
+    credentials: 'include',
+  })
 
   // 401 → intentar renovar cookie y reintentar UNA vez
   if (res.status === 401 && !retry) {
