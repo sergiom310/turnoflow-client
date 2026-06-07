@@ -13,10 +13,13 @@ import { useAuth } from '../../context/AuthContext'
 // Dev:  localhost:5173               → isTenant = false (superadmin)
 // Prod: cliente1.turnoflow.co        → isTenant = true
 // Prod: app.turnoflow.co             → isTenant = false (superadmin)
+const RESERVED_PLATFORM_HOSTS = new Set(['turnoflow.bitwia.com', 'app.turnoflow.co', 'turnoflow.co'])
+
 const detectSubdomain = () => {
   const hostname = window.location.hostname
   const parts    = hostname.split('.')
   // "localhost" o IPs → superadmin
+  if (RESERVED_PLATFORM_HOSTS.has(hostname)) return null
   if (parts.length < 2 || hostname === 'localhost') return null
   // El subdominio es la primera parte si hay al menos 3 segmentos
   if (parts.length >= 3) return parts[0]

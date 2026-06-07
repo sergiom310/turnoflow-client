@@ -26,11 +26,18 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api/v1'
 
+const RESERVED_PLATFORM_HOSTS = new Set([
+  'turnoflow.bitwia.com',
+  'app.turnoflow.co',
+  'turnoflow.co',
+])
+
 const detectTenantSubdomain = () => {
   if (typeof window === 'undefined') return null
   const hostname = window.location.hostname
   const parts = hostname.split('.')
 
+  if (RESERVED_PLATFORM_HOSTS.has(hostname)) return null
   if (parts.length < 2 || hostname === 'localhost') return null
   if (parts.length >= 3) return parts[0]
   return null
