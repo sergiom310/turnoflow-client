@@ -80,8 +80,10 @@ const tenantRequest = async (endpoint, options = {}, retry = false) => {
     credentials: 'include',
   })
 
+  const isTenantAuthEndpoint = endpoint === '/auth/login' || endpoint === '/auth/refresh'
+
   // 401 → intentar renovar cookie y reintentar UNA vez
-  if (res.status === 401 && !retry) {
+  if (res.status === 401 && !retry && !isTenantAuthEndpoint) {
     const refreshed = await tryRefreshTenant()
     if (refreshed) return tenantRequest(endpoint, options, true)
     // Sin sesión válida → limpiar datos de localStorage y redirigir
@@ -148,7 +150,9 @@ const adminRequest = async (endpoint, options = {}, retry = false) => {
   const url = `${BASE_URL}${endpoint}`
   const res = await fetch(url, options)
 
-  if (res.status === 401 && !retry) {
+  const isAdminAuthEndpoint = endpoint === '/superadmin/auth/login' || endpoint === '/superadmin/auth/refresh'
+
+  if (res.status === 401 && !retry && !isAdminAuthEndpoint) {
     const refreshed = await tryRefreshAdmin()
     if (refreshed) {
       options.headers = { ...options.headers, Authorization: `Bearer ${getSaToken()}` }
