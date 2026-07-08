@@ -4,6 +4,9 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
+# 🔥 APAGAR EL FILTRO DE SEGURIDAD GLOBAL DE PNPM PARA DEJAR COMPILAR ESBUILD
+ENV PNPM_IGNORE_SCRIPTS=false
+
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
