@@ -26,20 +26,20 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api/v1'
 
-const RESERVED_PLATFORM_HOSTS = new Set([
-  'turnoflow.bitwia.com',
-  'app.turnoflow.co',
-  'turnoflow.co',
-])
+// Dominio raíz de la plataforma. Se define por entorno:
+//   Probeta:    VITE_PLATFORM_DOMAIN=turnoflow.probeta.dev
+//   Producción: VITE_PLATFORM_DOMAIN=turnoflow.com
+const PLATFORM_DOMAIN = import.meta.env.VITE_PLATFORM_DOMAIN || 'turnoflow.co'
 
 const detectTenantSubdomain = () => {
   if (typeof window === 'undefined') return null
   const hostname = window.location.hostname
-  const parts = hostname.split('.')
-
-  if (RESERVED_PLATFORM_HOSTS.has(hostname)) return null
-  if (parts.length < 2 || hostname === 'localhost') return null
-  if (parts.length >= 3) return parts[0]
+  if (hostname === 'localhost') return null
+  if (hostname === PLATFORM_DOMAIN) return null
+  if (hostname.endsWith(`.${PLATFORM_DOMAIN}`)) {
+    const sub = hostname.slice(0, -(PLATFORM_DOMAIN.length + 1))
+    if (sub && !sub.includes('.')) return sub
+  }
   return null
 }
 

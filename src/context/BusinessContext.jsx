@@ -97,8 +97,10 @@ export const BusinessProvider = ({ children }) => {
         // Si hay un subdominio de tenant pero aún no hay sesión (p.ej. pantalla de login),
         // NO aplicar colores de fallback: Login.jsx cargará /theme y aplicará los correctos.
         const hostname = window.location.hostname
-        const parts = hostname.split('.')
-        const hasTenantSubdomain = parts.length >= 3 && hostname !== 'localhost'
+        const platformDomain = import.meta.env.VITE_PLATFORM_DOMAIN || 'turnoflow.co'
+        const hasTenantSubdomain = hostname !== 'localhost'
+          && hostname !== platformDomain
+          && hostname.endsWith(`.${platformDomain}`)
         if (!hasTenantSubdomain) {
           const savedType = savedTenant?.business_type || localStorage.getItem('businessType') || 'beauty'
           setBusinessType(savedType)

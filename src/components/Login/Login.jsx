@@ -13,16 +13,22 @@ import { useAuth } from '../../context/AuthContext'
 // Dev:  localhost:5173               → isTenant = false (superadmin)
 // Prod: cliente1.turnoflow.co        → isTenant = true
 // Prod: app.turnoflow.co             → isTenant = false (superadmin)
-const RESERVED_PLATFORM_HOSTS = new Set(['turnoflow.bitwia.com', 'app.turnoflow.co', 'turnoflow.co'])
+// Dominio raíz de la plataforma. Se define por entorno:
+//   Probeta:    VITE_PLATFORM_DOMAIN=turnoflow.probeta.dev
+//   Producción: VITE_PLATFORM_DOMAIN=turnoflow.com
+const PLATFORM_DOMAIN = import.meta.env.VITE_PLATFORM_DOMAIN || 'turnoflow.co'
 
 const detectSubdomain = () => {
   const hostname = window.location.hostname
-  const parts    = hostname.split('.')
-  // "localhost" o IPs → superadmin
-  if (RESERVED_PLATFORM_HOSTS.has(hostname)) return null
-  if (parts.length < 2 || hostname === 'localhost') return null
-  // El subdominio es la primera parte si hay al menos 3 segmentos
-  if (parts.length >= 3) return parts[0]
+  if (hostname === 'localhost') return null
+  // El dominio raíz de la plataforma nunca es un tenant
+  if (hostname === PLATFORM_DOMAIN) return null
+  // Un subdominio directo del dominio raíz sí es un tenant
+  // ej: cliente1.turnoflow.probeta.dev → 'cliente1'
+  if (hostname.endsWith(`.${PLATFORM_DOMAIN}`)) {
+    const sub = hostname.slice(0, -(PLATFORM_DOMAIN.length + 1))
+    if (sub && !sub.includes('.')) return sub
+  }
   return null
 }
 
