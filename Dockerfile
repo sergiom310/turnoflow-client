@@ -3,7 +3,11 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml ./
+
+# Creamos el workspace.yaml inline — contenido garantizado
+RUN printf 'packages:\n  - "."\nonlyBuiltDependencies:\n  - esbuild\n' > pnpm-workspace.yaml
+
 RUN pnpm install --frozen-lockfile
 
 COPY . .
